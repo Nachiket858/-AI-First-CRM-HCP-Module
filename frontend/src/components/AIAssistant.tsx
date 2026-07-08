@@ -6,7 +6,7 @@ import { Send, Sparkles, Database, Trash2, Cpu } from 'lucide-react';
 
 export const AIAssistant: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
-  const { messages, toolLogs, isTyping } = useSelector((state: RootState) => state.chat);
+  const { messages, toolLogs, threadId, isTyping } = useSelector((state: RootState) => state.chat);
   const formData = useSelector((state: RootState) => state.interaction.formData);
 
   const [input, setInput] = useState('');
@@ -42,12 +42,13 @@ export const AIAssistant: React.FC = () => {
     // 2. Format message history for LLM context
     const chatHistory = messages.map(m => ({ sender: m.sender, text: m.text }));
     
-    // 3. Dispatch to agent backend
+    // 3. Dispatch to agent backend with threadId
     dispatch(
       sendMessageToAgent({
         text: query,
         formState: formData,
         history: chatHistory,
+        threadId: threadId
       })
     );
   };
@@ -63,50 +64,103 @@ export const AIAssistant: React.FC = () => {
     setInput(query);
   };
 
-  // Helper to parse simple markdown to HTML elements
+  // Helper to parse simple markdown & tables to HTML elements
   const formatMarkdown = (text: string) => {
-    // 1. Split lines
     const lines = text.split('\n');
-    let insideList = false;
     const elements: React.ReactNode[] = [];
-
-    lines.forEach((line, idx) => {
+    
+    let i = 0;
+    while (i < lines.length) {
+      const line = lines[i];
+      
+      // Check if it's a table line
+      if (line.trim().startsWith('|')) {
+        const tableLines: string[] = [];
+        while (i < lines.length && lines[i].trim().startsWith('|')) {
+          tableLines.push(lines[i]);
+          i++;
+        }
+        
+        if (tableLines.length >= 1) {
+          const parseRow = (rowStr: string) => {
+            const cells = rowStr.split('|').map(c => c.trim());
+            if (cells[0] === '') cells.shift();
+            if (cells[cells.length - 1] === '') cells.pop();
+            return cells;
+          };
+          
+          const headers = parseRow(tableLines[0]);
+          const dataRowsStart = (tableLines.length > 1 && tableLines[1].includes('-')) ? 2 : 1;
+          const dataRows = tableLines.slice(dataRowsStart).map(parseRow);
+          
+          const formatText = (txt: string) => {
+            const parts = txt.split('**');
+            return parts.map((part, pIdx) => {
+              if (pIdx % 2 === 1) {
+                return <strong key={pIdx} style={{ color: '#60a5fa', fontWeight: 600 }}>{part}</strong>;
+              }
+              return part;
+            });
+          };
+          
+          elements.push(
+            <table key={`table-${i}`} className="assistant-table">
+              <thead>
+                <tr>
+                  {headers.map((h, hIdx) => (
+                    <th key={`th-${hIdx}`}>{formatText(h)}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {dataRows.map((row, rIdx) => (
+                  <tr key={`tr-${rIdx}`}>
+                    {row.map((cell, cIdx) => (
+                      <td key={`td-${cIdx}`}>{formatText(cell)}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          );
+        }
+        continue;
+      }
+      
       // Check if bullet point
       const isBullet = line.trim().startsWith('- ') || line.trim().startsWith('* ');
-      
       let content = line;
       if (isBullet) {
         content = line.trim().substring(2);
       }
-
-      // Parse bold tags **text**
-      const parts = content.split('**');
-      const formattedParts = parts.map((part, pIdx) => {
-        if (pIdx % 2 === 1) {
-          return <strong key={pIdx} style={{ color: '#60a5fa', fontWeight: 600 }}>{part}</strong>;
-        }
-        return part;
-      });
-
+      
+      const formatText = (txt: string) => {
+        const parts = txt.split('**');
+        return parts.map((part, pIdx) => {
+          if (pIdx % 2 === 1) {
+            return <strong key={pIdx} style={{ color: '#60a5fa', fontWeight: 600 }}>{part}</strong>;
+          }
+          return part;
+        });
+      };
+      
       if (isBullet) {
-        if (!insideList) {
-          insideList = true;
-        }
         elements.push(
-          <li key={`line-${idx}`} style={{ marginLeft: '16px', marginBottom: '4px' }}>
-            {formattedParts}
+          <li key={`line-${i}`} style={{ marginLeft: '16px', marginBottom: '4px' }}>
+            {formatText(content)}
           </li>
         );
       } else {
-        insideList = false;
         elements.push(
-          <div key={`line-${idx}`} style={{ marginBottom: '6px' }}>
-            {formattedParts}
+          <div key={`line-${i}`} style={{ marginBottom: '6px' }}>
+            {formatText(content)}
           </div>
         );
       }
-    });
-
+      
+      i++;
+    }
+    
     return <div className="message-content">{elements}</div>;
   };
 
@@ -155,7 +209,7 @@ export const AIAssistant: React.FC = () => {
           </div>
         ))}
 
-        {isTyping && (
+        {isTyping && messages[messages.length - 1]?.sender === 'user' && (
           <div className="message-bubble assistant" style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
             <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--text-muted)', animation: 'soundWave 1s infinite alternate' }} />
             <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--text-muted)', animation: 'soundWave 1s infinite alternate', animationDelay: '0.2s' }} />

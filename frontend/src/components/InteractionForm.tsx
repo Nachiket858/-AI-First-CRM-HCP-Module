@@ -23,6 +23,7 @@ export const InteractionForm: React.FC = () => {
     (state: RootState) => state.interaction
   );
   const chatMessages = useSelector((state: RootState) => state.chat.messages);
+  const threadId = useSelector((state: RootState) => state.chat.threadId);
 
   const [hcpSearch, setHcpSearch] = useState('');
   const [showHcpDropdown, setShowHcpDropdown] = useState(false);
@@ -102,7 +103,8 @@ export const InteractionForm: React.FC = () => {
         dispatch(sendMessageToAgent({
           text: transcript,
           formState: formData,
-          history: chatHistory
+          history: chatHistory,
+          threadId: threadId
         }));
       }, 3000);
     }

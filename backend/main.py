@@ -1,14 +1,16 @@
 from fastapi import FastAPI, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 import os
+import json
 
 from database import engine, Base, get_db
 from models import HCP, Material, Sample, Interaction, interaction_materials, interaction_samples
-from schemas import ChatRequest, ChatResponse, FormState, ToolCallLog
+from schemas import ChatRequest, FormState, ToolCallLog
 from seed import seed_database
 from agent import agent_app
-from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.messages import HumanMessage, AIMessage, AIMessageChunk
 
 # Auto-create tables and seed data on startup
 seed_database()
@@ -130,44 +132,102 @@ def save_interaction(form: FormState, db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/chat", response_model=ChatResponse)
-def run_chat(request: ChatRequest):
+@app.post("/api/chat")
+async def run_chat(request: ChatRequest):
     try:
-        # Convert message history to LangChain message formats
-        messages = []
-        for msg in request.messages:
-            if msg.sender == "user":
-                messages.append(HumanMessage(content=msg.text))
-            else:
-                messages.append(AIMessage(content=msg.text))
-                
-        # Run through LangGraph
+        # Get the thread_id
+        thread_id = request.thread_id or "default-thread"
+        
+        # We only pass the latest user message to the state to avoid duplicating messages in LangGraph MemorySaver
+        latest_message = request.messages[-1].text if request.messages else ""
+        
+        # Run through LangGraph with checkpointer configuration
+        config = {
+            "configurable": {"thread_id": thread_id},
+            "recursion_limit": 20
+        }
+        
+        # Create initial state
         initial_state = {
-            "messages": messages,
+            "messages": [HumanMessage(content=latest_message)],
             "form_state": request.form_state.model_dump(),
             "tool_logs": []
         }
         
-        config = {"recursion_limit": 20}
-        output_state = agent_app.invoke(initial_state, config)
-        
-        # Get final assistant message
-        final_message = output_state["messages"][-1].content
-        updated_form_state = output_state["form_state"]
-        tool_logs = [
-            ToolCallLog(
-                tool_name=log["tool_name"],
-                arguments=log["arguments"],
-                result=log["result"]
-            )
-            for log in output_state.get("tool_logs", [])
-        ]
-        
-        return ChatResponse(
-            response=final_message,
-            form_state=FormState(**updated_form_state),
-            tool_calls=tool_logs
-        )
+        async def event_generator():
+            buffer = ""
+            in_response_value = False
+            
+            async for chunk, metadata in agent_app.astream(initial_state, config, stream_mode="messages"):
+                node = metadata.get("langgraph_node")
+                
+                # We only want to stream tokens from the call_model node that are AIMessageChunks
+                if node == "call_model" and isinstance(chunk, AIMessageChunk):
+                    # Check if it has tool calls
+                    if chunk.tool_calls:
+                        continue
+                        
+                    content = chunk.content
+                    if not content:
+                        continue
+                        
+                    buffer += content
+                    
+                    if not in_response_value:
+                        # Check if we have seen "[RESPONSE]"
+                        idx = buffer.find("[RESPONSE]")
+                        if idx != -1:
+                            in_response_value = True
+                            remaining = buffer[idx + 10:]
+                            buffer = ""
+                            if remaining:
+                                end_idx = remaining.find("[/RESPONSE]")
+                                if end_idx != -1:
+                                    yield json.dumps({"type": "token", "content": remaining[:end_idx]}) + "\n"
+                                    in_response_value = False
+                                else:
+                                    yield json.dumps({"type": "token", "content": remaining}) + "\n"
+                        elif len(buffer) > 20 and "[" not in buffer:
+                            yield json.dumps({"type": "token", "content": buffer}) + "\n"
+                            buffer = ""
+                            in_response_value = True
+                    else:
+                        end_idx = buffer.find("[/RESPONSE]")
+                        if end_idx != -1:
+                            yield json.dumps({"type": "token", "content": buffer[:end_idx]}) + "\n"
+                            buffer = ""
+                            in_response_value = False
+                        else:
+                            if len(buffer) > 11:
+                                yield json.dumps({"type": "token", "content": buffer[:-11]}) + "\n"
+                                buffer = buffer[-11:]
+                                
+            # Flush any remaining buffer if it doesn't contain tags
+            if in_response_value and buffer:
+                end_idx = buffer.find("[/RESPONSE]")
+                if end_idx != -1:
+                    yield json.dumps({"type": "token", "content": buffer[:end_idx]}) + "\n"
+                elif "[/" not in buffer:
+                    yield json.dumps({"type": "token", "content": buffer}) + "\n"
+                                
+            # Retrieve final state
+            state = await agent_app.aget_state(config)
+            final_state = state.values
+            
+            form_state = final_state.get("form_state", {})
+            tool_logs = [
+                {
+                    "tool_name": log["tool_name"],
+                    "arguments": log["arguments"],
+                    "result": log["result"]
+                }
+                for log in final_state.get("tool_logs", [])
+            ]
+            
+            yield json.dumps({"type": "form_state", "content": form_state}) + "\n"
+            yield json.dumps({"type": "tool_logs", "content": tool_logs}) + "\n"
+            
+        return StreamingResponse(event_generator(), media_type="text/event-stream")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

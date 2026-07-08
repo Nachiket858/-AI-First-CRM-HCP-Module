@@ -1,12 +1,39 @@
+from dotenv import load_dotenv
+load_dotenv(override=True)
+
 import os
 import json
 from typing import Annotated, Sequence, TypedDict, List, Dict, Any
-from dotenv import load_dotenv
 
 from langchain_core.messages import BaseMessage, SystemMessage, HumanMessage, AIMessage, ToolMessage
 from langchain_groq import ChatGroq
 from langgraph.graph import StateGraph, END
 from langgraph.graph.message import add_messages
+from langgraph.checkpoint.memory import MemorySaver
+from langchain.output_parsers import PydanticOutputParser
+from pydantic import BaseModel, Field
+
+class TagOutputParser:
+    def get_format_instructions(self) -> str:
+        return """You MUST wrap your final response message to the user in [RESPONSE] and [/RESPONSE] tags. Do not output any conversational filler or thoughts outside these tags.
+
+Example format:
+[RESPONSE]
+Your interaction has been logged successfully.
+[/RESPONSE]
+"""
+    
+    def parse(self, text: str) -> str:
+        import re
+        match = re.search(r"\[RESPONSE\](.*?)\[/RESPONSE\]", text, re.DOTALL)
+        if match:
+            return match.group(1).strip()
+        # Fallback
+        clean = text.replace("[RESPONSE]", "").replace("[/RESPONSE]", "").strip()
+        return clean
+
+parser = TagOutputParser()
+FORMAT_INSTRUCTIONS = parser.get_format_instructions()
 
 # Import tools
 from tools import (
@@ -17,8 +44,6 @@ from tools import (
     fetch_product_materials,
     email_materials_to_hcp
 )
-
-load_dotenv()
 
 # Dictionary mapping tool names to actual functions for execution
 TOOLS_MAP = {
@@ -79,12 +104,19 @@ Guidelines:
 6. **Email Materials**: When they ask to email files or brochures to the HCP, call `email_materials_to_hcp`.
 
 Always use tools when the user requests actions corresponding to these behaviors. If a tool returns state updates, the form on the left will automatically synchronize. Focus on being a helpful, professional, and compliant medical sales assistant.
+
+{FORMAT_INSTRUCTIONS}
 """
     
     # Prepend the system prompt to the messages list
     full_messages = [SystemMessage(content=system_prompt)] + list(messages)
     
     response = llm_with_tools.invoke(full_messages)
+    
+    # Parse final response if not calling tools
+    if not (hasattr(response, "tool_calls") and response.tool_calls):
+        response.content = parser.parse(response.content)
+                
     return {"messages": [response]}
 
 # Define Node: Execute tools
@@ -183,4 +215,5 @@ workflow.add_conditional_edges(
 workflow.add_edge("execute_tools", "call_model")
 
 # Compile
-agent_app = workflow.compile()
+memory = MemorySaver()
+agent_app = workflow.compile(checkpointer=memory)

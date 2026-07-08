@@ -4,6 +4,145 @@ from database import SessionLocal
 from models import HCP, Material, Sample, Interaction, EmailLog
 import datetime
 
+# Helper functions for smart entity matching
+def find_hcp(db, name_query: str):
+    if not name_query:
+        return None
+    # 1. Try exact or simple case-insensitive substring match
+    hcp = db.query(HCP).filter(HCP.name.ilike(f"%{name_query}%")).first()
+    if hcp:
+        return hcp
+    
+    # 2. Clean query and try word-by-word intersection matching
+    clean_query = name_query.lower().replace("dr.", "").replace("dr", "").strip()
+    words = [w for w in clean_query.split() if w]
+    if not words:
+        return None
+        
+    all_hcps = db.query(HCP).all()
+    best_match = None
+    max_matches = 0
+    for h in all_hcps:
+        h_clean = h.name.lower().replace("dr.", "").replace("dr", "").strip()
+        matches = sum(1 for word in words if word in h_clean)
+        if matches > max_matches:
+            max_matches = matches
+            best_match = h
+            
+    if max_matches > 0:
+        return best_match
+    return None
+
+def find_single_material(db, mat_name: str):
+    if not mat_name:
+        return None
+    # Try case-insensitive substring
+    mat = db.query(Material).filter(Material.name.ilike(f"%{mat_name}%")).first()
+    if mat:
+        return mat
+        
+    # Smart keyword match
+    clean_name = mat_name.strip().lower()
+    for char in ["-", "&", ",", ".", "/"]:
+        clean_name = clean_name.replace(char, " ")
+    words = [w for w in clean_name.split() if w]
+    if not words:
+        return None
+        
+    all_materials = db.query(Material).all()
+    # Check if all words match
+    for m in all_materials:
+        m_text = f"{m.name} {m.type}".lower()
+        if all(w in m_text for w in words):
+            return m
+    # Check if any word matches
+    for m in all_materials:
+        m_text = f"{m.name} {m.type}".lower()
+        if any(w in m_text for w in words):
+            return m
+    return None
+
+def find_single_sample(db, sam_name: str):
+    if not sam_name:
+        return None
+    # Try case-insensitive substring
+    sam = db.query(Sample).filter(Sample.name.ilike(f"%{sam_name}%")).first()
+    if sam:
+        return sam
+        
+    # Smart keyword match
+    clean_name = sam_name.strip().lower()
+    for char in ["-", "&", ",", ".", "/"]:
+        clean_name = clean_name.replace(char, " ")
+    words = [w for w in clean_name.split() if w]
+    if not words:
+        return None
+        
+    all_samples = db.query(Sample).all()
+    # Check if all words match
+    for s in all_samples:
+        s_text = f"{s.name} {s.description or ''}".lower()
+        if all(w in s_text for w in words):
+            return s
+    # Check if any word matches
+    for s in all_samples:
+        s_text = f"{s.name} {s.description or ''}".lower()
+        if any(w in s_text for w in words):
+            return s
+    return None
+
+def find_materials_and_samples(db, search_query: str):
+    if not search_query:
+        return [], []
+    
+    clean_query = search_query.strip().lower()
+    for char in ["-", "&", ",", ".", "/"]:
+        clean_query = clean_query.replace(char, " ")
+    words = [w for w in clean_query.split() if w]
+    
+    # Try simple case-insensitive substring match first
+    simple_mats = db.query(Material).filter(
+        (Material.name.ilike(f"%{search_query}%")) | 
+        (Material.type.ilike(f"%{search_query}%"))
+    ).all()
+    simple_sams = db.query(Sample).filter(
+        Sample.name.ilike(f"%{search_query}%")
+    ).all()
+    
+    if simple_mats or simple_sams:
+        return simple_mats, simple_sams
+        
+    # Keyword matching
+    all_materials = db.query(Material).all()
+    all_samples = db.query(Sample).all()
+    
+    matched_mats = []
+    matched_sams = []
+    
+    # All words match
+    for m in all_materials:
+        m_text = f"{m.name} {m.type}".lower()
+        if all(w in m_text for w in words):
+            matched_mats.append(m)
+    for s in all_samples:
+        s_text = f"{s.name} {s.description or ''}".lower()
+        if all(w in s_text for w in words):
+            matched_sams.append(s)
+            
+    # If no results, any word match
+    if not matched_mats and not matched_sams:
+        for m in all_materials:
+            m_text = f"{m.name} {m.type}".lower()
+            if any(w in m_text for w in words):
+                matched_mats.append(m)
+        for s in all_samples:
+            s_text = f"{s.name} {s.description or ''}".lower()
+            if any(w in s_text for w in words):
+                matched_sams.append(s)
+                
+    return matched_mats, matched_sams
+
+
 @tool
 def get_hcp_profile(hcp_name: str) -> str:
     """
@@ -14,7 +153,7 @@ def get_hcp_profile(hcp_name: str) -> str:
     db = SessionLocal()
     try:
         # Fuzzy match or exact match
-        hcp = db.query(HCP).filter(HCP.name.like(f"%{hcp_name}%")).first()
+        hcp = find_hcp(db, hcp_name)
         if not hcp:
             return json.dumps({
                 "status": "error",
@@ -86,7 +225,7 @@ def log_interaction_details(
         result_messages = []
         
         # 1. Match HCP
-        hcp = db.query(HCP).filter(HCP.name.like(f"%{hcp_name}%")).first()
+        hcp = find_hcp(db, hcp_name)
         if hcp:
             form_updates["hcp_id"] = hcp.id
             form_updates["hcp_name"] = hcp.name
@@ -119,7 +258,7 @@ def log_interaction_details(
         matched_materials = []
         if materials_shared:
             for mat_name in materials_shared:
-                mat = db.query(Material).filter(Material.name.like(f"%{mat_name}%")).first()
+                mat = find_single_material(db, mat_name)
                 if mat:
                     matched_materials.append(mat.name)
                 else:
@@ -131,7 +270,7 @@ def log_interaction_details(
         matched_samples = []
         if samples_distributed:
             for sam_name in samples_distributed:
-                sam = db.query(Sample).filter(Sample.name.like(f"%{sam_name}%")).first()
+                sam = find_single_sample(db, sam_name)
                 if sam:
                     matched_samples.append(sam.name)
                 else:
@@ -215,11 +354,11 @@ def edit_interaction_details(field_name: str, new_value: str) -> str:
             matched_items = []
             if mapped_field == "materials_shared":
                 for item in items:
-                    mat = db.query(Material).filter(Material.name.like(f"%{item}%")).first()
+                    mat = find_single_material(db, item)
                     matched_items.append(mat.name if mat else item)
             else:
                 for item in items:
-                    sam = db.query(Sample).filter(Sample.name.like(f"%{item}%")).first()
+                    sam = find_single_sample(db, item)
                     matched_items.append(sam.name if sam else item)
                     
             form_updates[mapped_field] = matched_items
@@ -227,7 +366,7 @@ def edit_interaction_details(field_name: str, new_value: str) -> str:
         else:
             # Handle HCP Name matching to get hcp_id as well
             if mapped_field == "hcp_name":
-                hcp = db.query(HCP).filter(HCP.name.like(f"%{new_value}%")).first()
+                hcp = find_hcp(db, new_value)
                 if hcp:
                     form_updates["hcp_id"] = hcp.id
                     form_updates["hcp_name"] = hcp.name
@@ -303,16 +442,8 @@ def fetch_product_materials(search_query: str) -> str:
     """
     db = SessionLocal()
     try:
-        # Search in Materials table
-        mats = db.query(Material).filter(
-            (Material.name.like(f"%{search_query}%")) | 
-            (Material.type.like(f"%{search_query}%"))
-        ).all()
-        
-        # Search in Samples table (for rep inventory check)
-        sams = db.query(Sample).filter(
-            (Sample.name.like(f"%{search_query}%"))
-        ).all()
+        # Search in Materials and Samples using smart keyword match
+        mats, sams = find_materials_and_samples(db, search_query)
         
         results = []
         for m in mats:
@@ -360,7 +491,7 @@ def email_materials_to_hcp(hcp_name: str, materials: list[str]) -> str:
     """
     db = SessionLocal()
     try:
-        hcp = db.query(HCP).filter(HCP.name.like(f"%{hcp_name}%")).first()
+        hcp = find_hcp(db, hcp_name)
         if not hcp:
             return json.dumps({
                 "status": "error",
@@ -370,7 +501,7 @@ def email_materials_to_hcp(hcp_name: str, materials: list[str]) -> str:
         # Verify materials
         valid_materials = []
         for mat_name in materials:
-            mat = db.query(Material).filter(Material.name.like(f"%{mat_name}%")).first()
+            mat = find_single_material(db, mat_name)
             if mat:
                 valid_materials.append(mat.name)
             else:

@@ -98,6 +98,7 @@ class ChatMessage(BaseModel):
 class ChatRequest(BaseModel):
     messages: List[ChatMessage]
     form_state: FormState
+    thread_id: Optional[str] = "default-thread"
 
 class ToolCallLog(BaseModel):
     tool_name: str

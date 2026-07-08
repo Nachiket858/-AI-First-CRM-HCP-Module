@@ -40,7 +40,8 @@ def run_test():
     }
     
     print("\n[Input prompt]: 'Today I met with Dr. Jenkins and discussed Prodo-X trials. The sentiment was positive and I shared the Dosage Brochure.'")
-    output = agent_app.invoke(state)
+    config = {"configurable": {"thread_id": "test-thread"}, "recursion_limit": 20}
+    output = agent_app.invoke(state, config)
     
     print("\n[Agent Response]:")
     print(output["messages"][-1].content)
