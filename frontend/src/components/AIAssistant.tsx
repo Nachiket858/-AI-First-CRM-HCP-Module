@@ -11,15 +11,21 @@ export const AIAssistant: React.FC = () => {
 
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Suggestions for testing the tools
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    }
+  }, [input]);
+
   const suggestions = [
-    { text: 'Log meeting with Dr. Sarah Jenkins', query: 'Today I met with Dr. Sarah Jenkins and discussed Prodo-X efficacy. Sentiment was positive.' },
-    { text: 'Look up Dr. Jenkins profile', query: 'Can you tell me about Dr. Sarah Jenkins specialty and preferences?' },
+    { text: 'Log meeting with Dr. Amit Sharma', query: 'Today I met with Dr. Amit Sharma and discussed Prodo-X efficacy. Sentiment was positive.' },
+    { text: 'Look up Dr. Sharma\'s profile', query: 'Can you tell me about Dr. Amit Sharma\'s specialty and preferences?' },
     { text: 'Update sentiment to Neutral', query: 'Actually, change the sentiment to Neutral.' },
     { text: 'Search for Prodo materials', query: 'Search for brochures related to Prodo.' },
-    { text: 'Suggest follow-up action', query: 'Suggest follow-up actions based on the topics we discussed.' },
-    { text: 'Email materials to doctor', query: 'Please email the shared brochures to the doctor.' }
+    { text: 'Suggest follow-up action', query: 'Suggest follow-up actions based on the topics we discussed.' }
   ];
 
   const scrollToBottom = () => {
@@ -35,6 +41,9 @@ export const AIAssistant: React.FC = () => {
     
     const query = input;
     setInput('');
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+    }
     
     // 1. Add user message locally
     dispatch(addUserMessage(query));
@@ -259,6 +268,7 @@ export const AIAssistant: React.FC = () => {
       <div className="chat-input-area">
         <div className="chat-input-wrapper">
           <textarea
+            ref={textareaRef}
             className="chat-input"
             rows={1}
             placeholder="Describe Interaction..."

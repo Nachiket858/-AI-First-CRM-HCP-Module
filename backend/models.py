@@ -23,10 +23,10 @@ class HCP(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(100), nullable=False, index=True)
-    specialty = Column(String(100), nullable=False)
-    clinic = Column(String(200), nullable=False)
+    specialty = Column(String(100), nullable=True)
+    clinic = Column(String(200), nullable=True)
     contact_number = Column(String(50), nullable=True)
-    email = Column(String(100), nullable=False, unique=True)
+    email = Column(String(100), nullable=True, unique=True)
     preferences = Column(Text, nullable=True)  # JSON or text containing preferences
 
     interactions = relationship("Interaction", back_populates="hcp", cascade="all, delete-orphan")

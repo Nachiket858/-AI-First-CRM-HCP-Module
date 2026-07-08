@@ -3,6 +3,80 @@ from langchain_core.tools import tool
 from database import SessionLocal
 from models import HCP, Material, Sample, Interaction, EmailLog
 import datetime
+import re
+
+def format_date(date_str: str) -> str:
+    if not date_str or not date_str.strip():
+        return datetime.date.today().strftime("%Y-%m-%d")
+    
+    date_clean = date_str.strip().lower()
+    
+    # Handle relative dates
+    if date_clean == "today":
+        return datetime.date.today().strftime("%Y-%m-%d")
+    elif date_clean == "yesterday":
+        return (datetime.date.today() - datetime.timedelta(days=1)).strftime("%Y-%m-%d")
+    elif date_clean == "tomorrow":
+        return (datetime.date.today() + datetime.timedelta(days=1)).strftime("%Y-%m-%d")
+        
+    # Try parsing different formats
+    formats = [
+        "%Y-%m-%d",      # 2026-07-08
+        "%m/%d/%Y",      # 07/08/2026
+        "%d/%m/%Y",      # 08/07/2026
+        "%m/%d/%y",      # 07/08/26
+        "%d/%m/%y",      # 08/07/26
+        "%B %d, %Y",     # July 08, 2026
+        "%b %d, %Y",     # Jul 08, 2026
+        "%d %B %Y",      # 08 July 2026
+        "%d %b %Y",      # 08 Jul 2026
+    ]
+    
+    for fmt in formats:
+        try:
+            return datetime.datetime.strptime(date_str.strip(), fmt).date().strftime("%Y-%m-%d")
+        except ValueError:
+            continue
+            
+    # Fallback to today if parsing fails
+    return datetime.date.today().strftime("%Y-%m-%d")
+
+def format_time(time_str: str) -> str:
+    if not time_str or not time_str.strip():
+        return datetime.datetime.now().strftime("%H:%M")
+        
+    time_clean = time_str.strip().upper()
+    
+    # Clean up space between digits and AM/PM
+    time_clean = re.sub(r'(\d+)\s*(AM|PM)', r'\1 \2', time_clean)
+    
+    formats = [
+        "%I:%M %p", # 10:30 PM
+        "%H:%M",    # 22:30
+        "%I %p",    # 10 PM
+        "%I:%M%p",  # 10:30PM
+        "%H:%M:%S", # 22:30:00
+    ]
+    
+    for fmt in formats:
+        try:
+            return datetime.datetime.strptime(time_clean, fmt).time().strftime("%H:%M")
+        except ValueError:
+            continue
+            
+    # Try just digits "1030" -> "10:30"
+    digits_only = re.sub(r'\D', '', time_clean)
+    if len(digits_only) == 4:
+        try:
+            h = int(digits_only[:2])
+            m = int(digits_only[2:])
+            if 0 <= h < 24 and 0 <= m < 60:
+                return f"{h:02d}:{m:02d}"
+        except ValueError:
+            pass
+            
+    # Fallback to current time if parsing fails
+    return datetime.datetime.now().strftime("%H:%M")
 
 # Helper functions for smart entity matching
 def find_hcp(db, name_query: str):
@@ -211,13 +285,18 @@ def log_interaction_details(
     outcomes: str = "",
     follow_up_actions: str = "",
     materials_shared: list[str] = None,
-    samples_distributed: list[str] = None
+    samples_distributed: list[str] = None,
+    hcp_specialty: str = "",
+    hcp_clinic: str = "",
+    hcp_email: str = "",
+    hcp_preferences: str = ""
 ) -> str:
     """
     Logs details of a new interaction or prepopulates the interaction form.
     Pass all extracted information from the conversation to prefill the fields.
     If date or time are not specified, you should check if they were mentioned, otherwise leave blank.
     materials_shared and samples_distributed should be lists of exact or partial names of items.
+    If details for a new or custom HCP are mentioned (specialty, clinic, email, preferences), pass them to prefill the HCP profile fields.
     """
     db = SessionLocal()
     try:
@@ -228,6 +307,10 @@ def log_interaction_details(
         if hcp:
             form_updates["hcp_id"] = hcp.id
             form_updates["hcp_name"] = hcp.name
+            form_updates["hcp_specialty"] = hcp_specialty or hcp.specialty
+            form_updates["hcp_clinic"] = hcp_clinic or hcp.clinic
+            form_updates["hcp_email"] = hcp_email or hcp.email
+            form_updates["hcp_preferences"] = hcp_preferences or hcp.preferences
             result_messages.append(
                 f"Selected existing HCP: {hcp.name} (Specialty: {hcp.specialty}, Clinic: {hcp.clinic}, Email: {hcp.email}, Preferences: {hcp.preferences or 'None'}). "
                 "CRITICAL: Inform the user that this doctor is already in the database and present this info. "
@@ -235,6 +318,10 @@ def log_interaction_details(
             )
         else:
             form_updates["hcp_name"] = hcp_name
+            form_updates["hcp_specialty"] = hcp_specialty
+            form_updates["hcp_clinic"] = hcp_clinic
+            form_updates["hcp_email"] = hcp_email
+            form_updates["hcp_preferences"] = hcp_preferences
             result_messages.append(
                 f"HCP '{hcp_name}' not found in database (will register as a custom entry). "
                 "Inform the user that this is a custom entry, and ask if they would like to add a specialty, clinic, email, or preferences to create a complete profile."
@@ -244,16 +331,8 @@ def log_interaction_details(
         form_updates["interaction_type"] = interaction_type
         form_updates["sentiment"] = sentiment
         
-        if date:
-            form_updates["date"] = date
-        else:
-            # Set today's date if not specified
-            form_updates["date"] = datetime.date.today().strftime("%m/%d/%Y")
-            
-        if time:
-            form_updates["time"] = time
-        else:
-            form_updates["time"] = datetime.datetime.now().strftime("%I:%M %p")
+        form_updates["date"] = format_date(date)
+        form_updates["time"] = format_time(time)
             
         form_updates["attendees"] = attendees
         form_updates["topics_discussed"] = topics_discussed
@@ -312,6 +391,10 @@ def edit_interaction_details(field_name: str, new_value: str) -> str:
     - follow_up_actions (string)
     - materials_shared (comma-separated string or list)
     - samples_distributed (comma-separated string or list)
+    - hcp_specialty (string)
+    - hcp_clinic (string)
+    - hcp_email (string)
+    - hcp_preferences (string)
     """
     db = SessionLocal()
     try:
@@ -337,7 +420,15 @@ def edit_interaction_details(field_name: str, new_value: str) -> str:
             "materials": "materials_shared",
             "materials_shared": "materials_shared",
             "samples": "samples_distributed",
-            "samples_distributed": "samples_distributed"
+            "samples_distributed": "samples_distributed",
+            "hcp_specialty": "hcp_specialty",
+            "specialty": "hcp_specialty",
+            "hcp_clinic": "hcp_clinic",
+            "clinic": "hcp_clinic",
+            "hcp_email": "hcp_email",
+            "email": "hcp_email",
+            "hcp_preferences": "hcp_preferences",
+            "preferences": "hcp_preferences"
         }
         
         mapped_field = field_mapping.get(clean_field)
@@ -377,6 +468,10 @@ def edit_interaction_details(field_name: str, new_value: str) -> str:
                 if hcp:
                     form_updates["hcp_id"] = hcp.id
                     form_updates["hcp_name"] = hcp.name
+                    form_updates["hcp_specialty"] = hcp.specialty
+                    form_updates["hcp_clinic"] = hcp.clinic
+                    form_updates["hcp_email"] = hcp.email
+                    form_updates["hcp_preferences"] = hcp.preferences
                     new_value = hcp.name
                     result_detail = (
                         f"Matched existing HCP: {hcp.name} (Specialty: {hcp.specialty}, Clinic: {hcp.clinic}). "
@@ -385,7 +480,17 @@ def edit_interaction_details(field_name: str, new_value: str) -> str:
                 else:
                     form_updates["hcp_id"] = None
                     form_updates["hcp_name"] = new_value
+                    form_updates["hcp_specialty"] = ""
+                    form_updates["hcp_clinic"] = ""
+                    form_updates["hcp_email"] = ""
+                    form_updates["hcp_preferences"] = ""
                     result_detail = f"HCP '{new_value}' not found in database (custom entry). Ask if they want to register specialty/clinic."
+            elif mapped_field == "date":
+                new_value = format_date(new_value)
+                form_updates[mapped_field] = new_value
+            elif mapped_field == "time":
+                new_value = format_time(new_value)
+                form_updates[mapped_field] = new_value
             else:
                 form_updates[mapped_field] = new_value
             display_value = new_value
@@ -496,50 +601,4 @@ def fetch_product_materials(search_query: str) -> str:
         return json.dumps({"status": "error", "result": str(e)})
     finally:
         db.close()
-
-
-@tool
-def email_materials_to_hcp(hcp_name: str, materials: list[str]) -> str:
-    """
-    Simulates sending the selected brochures/materials directly to the HCP's registered email.
-    Creates an outgoing email log record in the database.
-    Use this when the user explicitly requests to email the materials to the HCP.
-    """
-    db = SessionLocal()
-    try:
-        hcp = find_hcp(db, hcp_name)
-        if not hcp:
-            return json.dumps({
-                "status": "error",
-                "result": f"HCP '{hcp_name}' not found. Cannot send email."
-            })
-            
-        # Verify materials
-        valid_materials = []
-        for mat_name in materials:
-            mat = find_single_material(db, mat_name)
-            if mat:
-                valid_materials.append(mat.name)
-            else:
-                valid_materials.append(mat_name)
-                
-        # Create EmailLog record
-        email_log = EmailLog(
-            hcp_id=hcp.id,
-            subject=f"Requested Medical Literature: {', '.join(valid_materials[:2])}",
-            materials_sent=", ".join(valid_materials),
-            timestamp=datetime.datetime.now().strftime("%Y-%m-%d %I:%M %p"),
-            status="Sent"
-        )
-        db.add(email_log)
-        db.commit()
-        
-        return json.dumps({
-            "status": "success",
-            "result": f"Successfully emailed materials [{', '.join(valid_materials)}] to {hcp.name} at {hcp.email}."
-        })
-    except Exception as e:
-        db.rollback()
-        return json.dumps({"status": "error", "result": str(e)})
-    finally:
-        db.close()
+# (email_materials_to_hcp tool removed)

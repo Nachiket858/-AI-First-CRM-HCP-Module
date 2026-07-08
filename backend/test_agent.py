@@ -22,7 +22,7 @@ def run_test():
     
     # Test 1: Log Interaction Details
     state = {
-        "messages": [HumanMessage(content="Today I met with Dr. Jenkins and discussed Prodo-X trials. The sentiment was positive and I shared the Dosage Brochure.")],
+        "messages": [HumanMessage(content="Today I met with Dr. Sharma and discussed Prodo-X trials. The sentiment was positive and I shared the Dosage Brochure.")],
         "form_state": {
             "hcp_name": "",
             "interaction_type": "Meeting",
@@ -39,7 +39,7 @@ def run_test():
         "tool_logs": []
     }
     
-    print("\n[Input prompt]: 'Today I met with Dr. Jenkins and discussed Prodo-X trials. The sentiment was positive and I shared the Dosage Brochure.'")
+    print("\n[Input prompt]: 'Today I met with Dr. Sharma and discussed Prodo-X trials. The sentiment was positive and I shared the Dosage Brochure.'")
     config = {"configurable": {"thread_id": "test-thread"}, "recursion_limit": 20}
     output = agent_app.invoke(state, config)
     

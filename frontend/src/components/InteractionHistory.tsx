@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState, AppDispatch } from '../store';
 import { fetchInteractions } from '../slices/interactionSlice';
-import { Calendar, Clock, MessageSquare, Award, AlertCircle, ArrowRight } from 'lucide-react';
+import { Calendar, Clock, MessageSquare, Award, AlertCircle, ArrowRight, BookOpen, Gift } from 'lucide-react';
 
 export const InteractionHistory: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
@@ -90,6 +90,52 @@ export const InteractionHistory: React.FC = () => {
                     <MessageSquare size={12} /> Topics Discussed
                   </div>
                   <div className="history-section-text">{log.topics_discussed}</div>
+                </div>
+              )}
+
+              {log.materials_shared && log.materials_shared.length > 0 && (
+                <div className="history-section">
+                  <div className="history-section-title">
+                    <BookOpen size={12} /> Materials Shared
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
+                    {log.materials_shared.map((mat) => (
+                      <span key={mat} style={{
+                        background: '#f1f5f9',
+                        border: '1px solid #e2e8f0',
+                        color: 'var(--text-primary)',
+                        padding: '4px 10px',
+                        borderRadius: '6px',
+                        fontSize: '0.75rem',
+                        fontWeight: 500
+                      }}>
+                        {mat}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {log.samples_distributed && log.samples_distributed.length > 0 && (
+                <div className="history-section">
+                  <div className="history-section-title">
+                    <Gift size={12} /> Samples Distributed
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
+                    {log.samples_distributed.map((sam) => (
+                      <span key={sam} style={{
+                        background: '#f1f5f9',
+                        border: '1px solid #e2e8f0',
+                        color: 'var(--text-primary)',
+                        padding: '4px 10px',
+                        borderRadius: '6px',
+                        fontSize: '0.75rem',
+                        fontWeight: 500
+                      }}>
+                        {sam}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               )}
 

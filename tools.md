@@ -67,16 +67,15 @@ The graph state is defined in `backend/agent.py` as `AgentState`:
 
 ## 🛠️ System Tools & Conversational Logic
 
-The agent has access to 6 system tools defined in [tools.py](file:///i:/Temp/Persnal/AI-First%20CRM%20HCP%20Module/backend/tools.py):
+The agent has access to 5 system tools defined in [tools.py](file:///e:/AI-First-CRM-HCP-Module/backend/tools.py):
 
 | Tool Name | Description | Match Logic | Conversational Instruction |
 | :--- | :--- | :--- | :--- |
 | `get_hcp_profile` | Retrieves database information for a specific doctor. | Fuzzy matching with `find_hcp`. | Returns full details or warns if missing. |
-| `log_interaction_details` | Prefills multiple fields on the interaction logging form. | Fuzzy matches HCP, materials, and samples. | **Enriched**: Prompts LLM to inform user if doctor already exists, preventing duplicates, and asks for updates. |
-| `edit_interaction_details` | Updates a single field on the active form. | Direct key-value mapping with dynamic lookups. | **Enriched**: Guides LLM to flag if the changed HCP matches an existing profile. |
+| `log_interaction_details` | Prefills multiple fields on the interaction logging form and optionally pre-fills HCP details (specialty, clinic, email, preferences). | Fuzzy matches HCP, materials, samples, and resolves details. | **Enriched**: Prompts LLM to inform user if doctor already exists, preventing duplicates, and asks for updates. |
+| `edit_interaction_details` | Updates a single field on the active form (including specialty, clinic, email, and preferences). | Direct key-value mapping with dynamic lookups. | **Enriched**: Guides LLM to flag if the changed HCP matches an existing profile. |
 | `suggest_follow_up` | Recommends outcomes and follow-up steps. | Rule-based semantic keyword generation. | Prefills next-step text fields on the form. |
 | `fetch_product_materials` | Searches approved clinical materials or samples. | Case-insensitive substring matching. | Returns tables of pdfs and trial kits. |
-| `email_materials_to_hcp` | Simulates sending documents to the doctor. | Mock email verification. | Confirms delivery to the selected HCP. |
 
 ---
 
@@ -90,5 +89,5 @@ To provide a smooth user experience, responses are streamed token-by-token:
    - Tool execution status chunks are yielded as `{"type": "tool_logs", "content": "..."}`.
    - Live AI response tokens are yielded as `{"type": "token", "content": "..."}`.
 4. **Stateful Stream Parser**:
-   - The stream generator in [main.py](file:///i:/Temp/Persnal/AI-First%20CRM%20HCP%20Module/backend/main.py) uses a rolling token buffer to swallow the thought blocks and formatting tags (like `[RESPONSE]`, `[/RESPONSE]`).
+   - The stream generator in [main.py](file:///e:/AI-First-CRM-HCP-Module/backend/main.py) uses a rolling token buffer to swallow the thought blocks and formatting tags (like `[RESPONSE]`, `[/RESPONSE]`).
    - Ensures raw developer tags are stripped and short messages (like `"hi"`) are cleanly flushed without freezing.

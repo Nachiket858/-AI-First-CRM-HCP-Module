@@ -41,8 +41,7 @@ from tools import (
     log_interaction_details,
     edit_interaction_details,
     suggest_follow_up,
-    fetch_product_materials,
-    email_materials_to_hcp
+    fetch_product_materials
 )
 
 # Dictionary mapping tool names to actual functions for execution
@@ -51,8 +50,7 @@ TOOLS_MAP = {
     "log_interaction_details": log_interaction_details,
     "edit_interaction_details": edit_interaction_details,
     "suggest_follow_up": suggest_follow_up,
-    "fetch_product_materials": fetch_product_materials,
-    "email_materials_to_hcp": email_materials_to_hcp
+    "fetch_product_materials": fetch_product_materials
 }
 
 # Define LangGraph state
@@ -101,7 +99,6 @@ Guidelines:
 3. **Lookup Profile**: When the user asks about a doctor's preferences, specialty, or history, call `get_hcp_profile`.
 4. **Suggest Follow-ups**: If the user asks for suggestions or outcomes based on the discussion, call `suggest_follow_up`.
 5. **Fetch Materials**: When they ask to find brochures, study guides, or samples, call `fetch_product_materials`.
-6. **Email Materials**: When they ask to email files or brochures to the HCP, call `email_materials_to_hcp`.
 
 Always use tools when the user requests actions corresponding to these behaviors. If a tool returns state updates, the form on the left will automatically synchronize. Focus on being a helpful, professional, and compliant medical sales assistant.
 

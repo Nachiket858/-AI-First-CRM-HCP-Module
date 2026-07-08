@@ -524,7 +524,7 @@ body {
   border: 1px solid var(--border-color);
   border-radius: 28px;
   padding: 8px 8px 8px 20px;
-  align-items: center;
+  align-items: flex-end;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   transition: all 0.25s ease;
 }
@@ -545,7 +545,9 @@ body {
   font-size: 0.9rem;
   padding: 6px 0;
   resize: none;
-  max-height: 80px;
+  max-height: 120px;
+  height: auto;
+  overflow-y: auto;
 }
 
 .chat-send-btn {

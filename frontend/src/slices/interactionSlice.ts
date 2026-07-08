@@ -40,6 +40,10 @@ export interface FormData {
   follow_up_actions: string;
   materials_shared: string[];
   samples_distributed: string[];
+  hcp_specialty?: string;
+  hcp_clinic?: string;
+  hcp_email?: string;
+  hcp_preferences?: string;
 }
 
 export interface InteractionHistoryItem {
@@ -53,6 +57,8 @@ export interface InteractionHistoryItem {
   sentiment: string;
   outcomes: string;
   follow_up_actions: string;
+  materials_shared?: string[];
+  samples_distributed?: string[];
   status: string;
 }
 
@@ -98,6 +104,10 @@ const initialState: InteractionState = {
     follow_up_actions: '',
     materials_shared: [],
     samples_distributed: [],
+    hcp_specialty: '',
+    hcp_clinic: '',
+    hcp_email: '',
+    hcp_preferences: '',
   },
   hcps: [],
   materials: [],
@@ -153,13 +163,21 @@ const interactionSlice = createSlice({
       const { field, value } = action.payload;
       state.formData[field] = value as never;
       
-      // If we are changing hcp_name directly, check if it matches an existing HCP to update hcp_id
+      // If we are changing hcp_name directly, check if it matches an existing HCP to update hcp_id and prefill details
       if (field === 'hcp_name') {
         const matched = state.hcps.find(hcp => hcp.name.toLowerCase() === value.toLowerCase());
         if (matched) {
           state.formData.hcp_id = matched.id;
+          state.formData.hcp_specialty = matched.specialty;
+          state.formData.hcp_clinic = matched.clinic;
+          state.formData.hcp_email = matched.email;
+          state.formData.hcp_preferences = matched.preferences;
         } else {
           state.formData.hcp_id = null;
+          state.formData.hcp_specialty = '';
+          state.formData.hcp_clinic = '';
+          state.formData.hcp_email = '';
+          state.formData.hcp_preferences = '';
         }
       }
     },
@@ -201,6 +219,10 @@ const interactionSlice = createSlice({
         follow_up_actions: '',
         materials_shared: [],
         samples_distributed: [],
+        hcp_specialty: '',
+        hcp_clinic: '',
+        hcp_email: '',
+        hcp_preferences: '',
       };
       state.saveSuccess = false;
     },

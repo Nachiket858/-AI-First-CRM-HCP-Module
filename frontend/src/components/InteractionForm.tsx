@@ -32,7 +32,6 @@ export const InteractionForm: React.FC = () => {
   const [showSampleModal, setShowSampleModal] = useState(false);
   const [materialSearch, setMaterialSearch] = useState('');
   const [sampleSearch, setSampleSearch] = useState('');
-  const [voiceRecording, setVoiceRecording] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -72,45 +71,24 @@ export const InteractionForm: React.FC = () => {
     setShowHcpDropdown(false);
   };
 
+  const isNewHcp = formData.hcp_name.trim() !== '' && formData.hcp_id === null;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.hcp_name) {
       alert('Please select or enter an HCP Name.');
       return;
     }
+    if (isNewHcp && formData.hcp_email?.trim()) {
+      if (!formData.hcp_email.includes('@')) {
+        alert('Please enter a valid Email address for the new HCP.');
+        return;
+      }
+    }
     dispatch(submitInteraction(formData)).then(() => {
       dispatch(fetchInteractions());
+      dispatch(fetchHCPs());
     });
-  };
-
-  // Simulate Voice Note transcription (with user consent)
-  const handleVoiceNote = () => {
-    if (voiceRecording) {
-      setVoiceRecording(false);
-      return;
-    }
-    
-    const consent = window.confirm(
-      "Consent Request:\nWe require your consent to process voice recordings. Do you allow transcription and AI processing of your voice note?"
-    );
-    
-    if (consent) {
-      setVoiceRecording(true);
-      setTimeout(() => {
-        setVoiceRecording(false);
-        const transcript = "Met with Dr. Sarah Jenkins today. We discussed the efficacy of Prodo-X in elderly patients. She had positive sentiment and I shared the Prodo-X Clinical Trial Summary brochure.";
-        dispatch(addUserMessage(transcript));
-        
-        // Dispatch to backend
-        const chatHistory = chatMessages.map(m => ({ sender: m.sender, text: m.text }));
-        dispatch(sendMessageToAgent({
-          text: transcript,
-          formState: formData,
-          history: chatHistory,
-          threadId: threadId
-        }));
-      }, 3000);
-    }
   };
 
   const filteredHcps = hcps.filter((h) =>
@@ -214,6 +192,63 @@ export const InteractionForm: React.FC = () => {
             )}
           </div>
 
+          {isNewHcp && (
+            <div className="form-field-full" style={{
+              background: 'var(--bg-app)',
+              border: '1px dashed var(--primary)',
+              borderRadius: '12px',
+              padding: '20px',
+              marginTop: '10px',
+              marginBottom: '10px'
+            }}>
+              <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--primary)', marginBottom: '12px' }}>
+                👤 New HCP Profile Details (Optional)
+              </h4>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
+                <div className="form-group">
+                  <label className="form-label">Specialty</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="e.g. Cardiology, Oncology"
+                    value={formData.hcp_specialty || ''}
+                    onChange={(e) => handleInputChange('hcp_specialty', e.target.value)}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Clinic</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="e.g. Metro General Hospital"
+                    value={formData.hcp_clinic || ''}
+                    onChange={(e) => handleInputChange('hcp_clinic', e.target.value)}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Email</label>
+                  <input
+                    type="email"
+                    className="form-input"
+                    placeholder="doctor@example.com"
+                    value={formData.hcp_email || ''}
+                    onChange={(e) => handleInputChange('hcp_email', e.target.value)}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Clinical Preferences</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="e.g. Prefers email follow-ups"
+                    value={formData.hcp_preferences || ''}
+                    onChange={(e) => handleInputChange('hcp_preferences', e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="form-group">
             <label className="form-label">Interaction Type</label>
             <select
@@ -271,19 +306,6 @@ export const InteractionForm: React.FC = () => {
               value={formData.topics_discussed}
               onChange={(e) => handleInputChange('topics_discussed', e.target.value)}
             />
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={handleVoiceNote}
-              style={{
-                alignSelf: 'flex-start',
-                marginTop: '4px',
-                borderColor: voiceRecording ? 'var(--danger)' : 'var(--border-color)',
-                color: voiceRecording ? 'var(--danger)' : 'var(--text-primary)'
-              }}
-            >
-              🎤 {voiceRecording ? 'Recording (Processing transcription...)' : 'Summarize from Voice Note (Requires Consent)'}
-            </button>
           </div>
         </div>
 

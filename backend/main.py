@@ -28,7 +28,7 @@ app.add_middleware(
 
 @app.get("/api/hcps")
 def get_hcps(db: Session = Depends(get_db)):
-    hcps = db.query(HCP).all()
+    hcps = db.query(HCP).order_by(HCP.id.desc()).all()
     return hcps
 
 @app.get("/api/materials")
@@ -43,7 +43,7 @@ def get_samples(db: Session = Depends(get_db)):
 
 @app.get("/api/interactions")
 def get_interactions(db: Session = Depends(get_db)):
-    interactions = db.query(Interaction).order_by(Interaction.date.desc()).all()
+    interactions = db.query(Interaction).order_by(Interaction.id.desc()).all()
     # Serialize relationships nicely
     results = []
     for inter in interactions:
@@ -59,6 +59,8 @@ def get_interactions(db: Session = Depends(get_db)):
             "sentiment": inter.sentiment,
             "outcomes": inter.outcomes,
             "follow_up_actions": inter.follow_up_actions,
+            "materials_shared": [m.name for m in inter.materials],
+            "samples_distributed": [s.name for s in inter.samples],
             "status": inter.status
         })
     return results
@@ -74,12 +76,18 @@ def save_interaction(form: FormState, db: Session = Depends(get_db)):
             from tools import find_hcp
             hcp = find_hcp(db, form.hcp_name)
             if not hcp:
-                # Dynamically create new HCP if name doesn't match
+                # Dynamically create new HCP if name doesn't match, using form values if provided
+                specialty = form.hcp_specialty.strip() if (form.hcp_specialty and form.hcp_specialty.strip()) else None
+                clinic = form.hcp_clinic.strip() if (form.hcp_clinic and form.hcp_clinic.strip()) else None
+                email = form.hcp_email.strip() if (form.hcp_email and form.hcp_email.strip()) else None
+                preferences = form.hcp_preferences.strip() if (form.hcp_preferences and form.hcp_preferences.strip()) else None
+                
                 hcp = HCP(
                     name=form.hcp_name,
-                    specialty="General Practitioner",
-                    clinic="General Clinic",
-                    email=f"{form.hcp_name.lower().replace(' ', '.').replace('dr.', '')}@example.com"
+                    specialty=specialty,
+                    clinic=clinic,
+                    email=email,
+                    preferences=preferences
                 )
                 db.add(hcp)
                 db.commit()
@@ -87,6 +95,17 @@ def save_interaction(form: FormState, db: Session = Depends(get_db)):
 
         if not hcp:
             raise HTTPException(status_code=400, detail="HCP not specified and could not be resolved.")
+
+        # Update existing/new HCP profile if fields were provided in the form
+        if form.hcp_specialty is not None:
+            hcp.specialty = form.hcp_specialty.strip() if form.hcp_specialty.strip() else None
+        if form.hcp_clinic is not None:
+            hcp.clinic = form.hcp_clinic.strip() if form.hcp_clinic.strip() else None
+        if form.hcp_email is not None:
+            hcp.email = form.hcp_email.strip() if form.hcp_email.strip() else None
+        if form.hcp_preferences is not None:
+            hcp.preferences = form.hcp_preferences.strip() if form.hcp_preferences.strip() else None
+        db.commit()
 
         # Create or update Interaction
         interaction = None
@@ -131,7 +150,10 @@ def save_interaction(form: FormState, db: Session = Depends(get_db)):
         return {"status": "success", "interaction_id": interaction.id, "message": "Interaction saved successfully."}
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        err_msg = str(e)
+        if "UNIQUE constraint failed: hcps.email" in err_msg:
+            raise HTTPException(status_code=400, detail="The email address is already registered to another HCP.")
+        raise HTTPException(status_code=500, detail=err_msg)
 
 @app.post("/api/chat")
 async def run_chat(request: ChatRequest):

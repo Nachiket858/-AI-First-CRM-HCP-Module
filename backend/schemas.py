@@ -52,6 +52,10 @@ class FormState(BaseModel):
     follow_up_actions: str = ""
     materials_shared: List[str] = []  # Names or IDs of materials
     samples_distributed: List[str] = []  # Names or IDs of samples
+    hcp_specialty: Optional[str] = ""
+    hcp_clinic: Optional[str] = ""
+    hcp_email: Optional[str] = ""
+    hcp_preferences: Optional[str] = ""
 
 # --- Interaction Schemas ---
 class InteractionBase(BaseModel):
