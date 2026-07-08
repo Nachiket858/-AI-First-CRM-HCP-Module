@@ -88,7 +88,7 @@ export const sendMessageToAgent = createAsyncThunk(
       }
       
       const assistantMessageId = `msg-${Date.now()}`;
-      dispatch(startAssistantMessage({ id: assistantMessageId }));
+      let hasStartedAssistantMessage = false;
       
       const decoder = new TextDecoder();
       let streamBuffer = '';
@@ -108,6 +108,10 @@ export const sendMessageToAgent = createAsyncThunk(
           try {
             const data = JSON.parse(line);
             if (data.type === 'token') {
+              if (!hasStartedAssistantMessage) {
+                dispatch(startAssistantMessage({ id: assistantMessageId }));
+                hasStartedAssistantMessage = true;
+              }
               dispatch(appendAssistantToken({ id: assistantMessageId, token: data.content }));
             } else if (data.type === 'form_state') {
               const fs = data.content;
