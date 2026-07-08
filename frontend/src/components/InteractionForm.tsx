@@ -12,6 +12,7 @@ import {
   fetchHCPs,
   fetchMaterials,
   fetchSamples,
+  fetchInteractions,
   clearSaveSuccess
 } from '../slices/interactionSlice';
 import { addUserMessage, sendMessageToAgent } from '../slices/chatSlice';
@@ -77,7 +78,9 @@ export const InteractionForm: React.FC = () => {
       alert('Please select or enter an HCP Name.');
       return;
     }
-    dispatch(submitInteraction(formData));
+    dispatch(submitInteraction(formData)).then(() => {
+      dispatch(fetchInteractions());
+    });
   };
 
   // Simulate Voice Note transcription (with user consent)

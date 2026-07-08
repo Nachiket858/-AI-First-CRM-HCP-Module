@@ -42,11 +42,26 @@ export interface FormData {
   samples_distributed: string[];
 }
 
+export interface InteractionHistoryItem {
+  id: number;
+  hcp_name: string;
+  interaction_type: string;
+  date: string;
+  time: string;
+  attendees: string;
+  topics_discussed: string;
+  sentiment: string;
+  outcomes: string;
+  follow_up_actions: string;
+  status: string;
+}
+
 interface InteractionState {
   formData: FormData;
   hcps: HCP[];
   materials: Material[];
   samples: Sample[];
+  interactions: InteractionHistoryItem[];
   loading: boolean;
   error: string | null;
   isSaving: boolean;
@@ -87,6 +102,7 @@ const initialState: InteractionState = {
   hcps: [],
   materials: [],
   samples: [],
+  interactions: [],
   loading: false,
   error: null,
   isSaving: false,
@@ -106,6 +122,11 @@ export const fetchMaterials = createAsyncThunk('interaction/fetchMaterials', asy
 
 export const fetchSamples = createAsyncThunk('interaction/fetchSamples', async () => {
   const response = await axios.get(`${API_BASE}/samples`);
+  return response.data;
+});
+
+export const fetchInteractions = createAsyncThunk('interaction/fetchInteractions', async () => {
+  const response = await axios.get(`${API_BASE}/interactions`);
   return response.data;
 });
 
@@ -208,6 +229,10 @@ const interactionSlice = createSlice({
       // fetchSamples
       .addCase(fetchSamples.fulfilled, (state, action) => {
         state.samples = action.payload;
+      })
+      // fetchInteractions
+      .addCase(fetchInteractions.fulfilled, (state, action) => {
+        state.interactions = action.payload;
       })
       // submitInteraction
       .addCase(submitInteraction.pending, (state) => {

@@ -61,7 +61,228 @@ body {
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.25);
+  background: #f8fafc;
+}
+
+/* Sidebar Navigation Layout */
+.sidebar-nav {
+  width: 76px;
+  background: #ffffff;
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px 0;
+  gap: 16px;
+  z-index: 5;
+}
+
+.sidebar-nav-btn {
+  background: none;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: var(--text-muted);
+  width: 100%;
+  padding: 12px 0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-left: 3px solid transparent;
+  outline: none;
+}
+
+.sidebar-nav-btn:hover {
+  color: var(--primary);
+  background: var(--bg-app);
+}
+
+.sidebar-nav-btn.active {
+  color: var(--primary);
+  border-left-color: var(--primary);
+  background: var(--primary-glow);
+}
+
+.sidebar-nav-label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.dynamic-panel-container {
+  flex: 1.2;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #ffffff;
+  border-right: 1px solid var(--border-color);
+}
+
+/* Directory and History Layouts */
+.directory-panel, .history-panel {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  background: #ffffff;
+}
+
+.directory-list, .history-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* Directory & History Cards */
+.directory-card, .history-card {
+  background: #ffffff;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 18px 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02), 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: all 0.2s ease-in-out;
+}
+
+.directory-card:hover, .history-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 12px -1px rgba(15, 23, 42, 0.05), 0 2px 6px -1px rgba(15, 23, 42, 0.03);
+}
+
+.directory-card-header, .history-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  border-bottom: 1px solid #f1f5f9;
+  padding-bottom: 12px;
+  margin-bottom: 14px;
+}
+
+.directory-name, .history-hcp-name {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.directory-specialty {
+  font-size: 0.72rem;
+  background: var(--primary-glow);
+  color: var(--primary);
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-weight: 600;
+  display: inline-block;
+  margin-top: 4px;
+  border: 1px solid rgba(37, 99, 235, 0.1);
+}
+
+.directory-card-body, .history-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.directory-info-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+}
+
+.directory-info-icon {
+  color: var(--text-muted);
+}
+
+.directory-link {
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.directory-link:hover {
+  text-decoration: underline;
+}
+
+.directory-preferences {
+  background: #f8fafc;
+  padding: 10px 14px;
+  border-radius: 8px;
+  margin-top: 6px;
+  border: 1px dashed var(--border-color);
+}
+
+.directory-pref-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  letter-spacing: 0.025em;
+}
+
+.directory-pref-text {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+/* History Sentiment Badges */
+.sentiment-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sentiment-badge.active.positive {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+
+.sentiment-badge.active.neutral {
+  background: #fffbeb;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+.sentiment-badge.active.negative {
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+/* History Details Styling */
+.history-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.history-section-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  letter-spacing: 0.025em;
+}
+
+.history-section-text {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.45;
+  padding-left: 18px;
 }
 
 /* Common Layouts */
