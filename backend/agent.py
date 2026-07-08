@@ -48,8 +48,10 @@ def call_model(state: AgentState):
         error_msg = AIMessage(content="⚠️ **Groq API Key is missing!** Please set the `GROQ_API_KEY` in the `backend/.env` file to start using the real AI Assistant.")
         return {"messages": [error_msg]}
         
-    model_name = os.getenv("GROQ_MODEL", "gemma2-9b-it") # gemma2-9b-it or llama-3.3-70b-versatile
-    
+    model_name = os.getenv("GROQ_MODEL")
+    if not model_name:
+        error_msg = AIMessage(content="⚠️ **GROQ_MODEL is missing in .env file!** Please define `GROQ_MODEL=openai/gpt-oss-120b` (or another supported model) in your `backend/.env` file.")
+        return {"messages": [error_msg]}
     # Initialize ChatGroq model using langchain_groq
     llm = ChatGroq(
         groq_api_key=api_key,

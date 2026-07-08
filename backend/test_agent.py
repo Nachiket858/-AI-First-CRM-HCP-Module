@@ -5,7 +5,9 @@ from langchain_core.messages import HumanMessage
 from agent import agent_app
 from seed import seed_database
 
+import sys
 load_dotenv()
+sys.stdout.reconfigure(encoding='utf-8')
 
 def run_test():
     # Make sure DB is seeded
