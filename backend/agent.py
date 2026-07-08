@@ -158,7 +158,7 @@ def execute_tools(state: AgentState):
                     # Append ToolMessage to conversation
                     tool_messages.append(
                         ToolMessage(
-                            content=tool_data.get("result", tool_result_str),
+                            content=tool_result_str,
                             tool_call_id=tool_call_id
                         )
                     )

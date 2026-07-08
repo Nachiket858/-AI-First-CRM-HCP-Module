@@ -97,7 +97,7 @@ export const AIAssistant: React.FC = () => {
             const parts = txt.split('**');
             return parts.map((part, pIdx) => {
               if (pIdx % 2 === 1) {
-                return <strong key={pIdx} style={{ color: '#60a5fa', fontWeight: 600 }}>{part}</strong>;
+                return <strong key={pIdx} style={{ color: 'var(--primary)', fontWeight: 600 }}>{part}</strong>;
               }
               return part;
             });
@@ -138,7 +138,7 @@ export const AIAssistant: React.FC = () => {
         const parts = txt.split('**');
         return parts.map((part, pIdx) => {
           if (pIdx % 2 === 1) {
-            return <strong key={pIdx} style={{ color: '#60a5fa', fontWeight: 600 }}>{part}</strong>;
+            return <strong key={pIdx} style={{ color: 'var(--primary)', fontWeight: 600 }}>{part}</strong>;
           }
           return part;
         });
@@ -169,7 +169,7 @@ export const AIAssistant: React.FC = () => {
       {/* Header */}
       <div className="chat-header">
         <div className="chat-header-title">
-          <Sparkles size={16} style={{ color: '#60a5fa' }} />
+          <Sparkles size={16} style={{ color: 'var(--primary)' }} />
           <div>
             <div>AI Assistant</div>
             <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>

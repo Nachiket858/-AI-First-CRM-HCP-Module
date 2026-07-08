@@ -156,7 +156,8 @@ async def run_chat(request: ChatRequest):
         
         async def event_generator():
             buffer = ""
-            in_response_value = False
+            has_seen_response_tag = False
+            streaming_completed = False
             
             async for chunk, metadata in agent_app.astream(initial_state, config, stream_mode="messages"):
                 node = metadata.get("langgraph_node")
@@ -171,44 +172,75 @@ async def run_chat(request: ChatRequest):
                     if not content:
                         continue
                         
+                    if streaming_completed:
+                        continue
+                        
                     buffer += content
                     
-                    if not in_response_value:
+                    if not has_seen_response_tag:
                         # Check if we have seen "[RESPONSE]"
-                        idx = buffer.find("[RESPONSE]")
-                        if idx != -1:
-                            in_response_value = True
-                            remaining = buffer[idx + 10:]
-                            buffer = ""
-                            if remaining:
-                                end_idx = remaining.find("[/RESPONSE]")
-                                if end_idx != -1:
-                                    yield json.dumps({"type": "token", "content": remaining[:end_idx]}) + "\n"
-                                    in_response_value = False
-                                else:
-                                    yield json.dumps({"type": "token", "content": remaining}) + "\n"
-                        elif len(buffer) > 20 and "[" not in buffer:
-                            yield json.dumps({"type": "token", "content": buffer}) + "\n"
-                            buffer = ""
-                            in_response_value = True
-                    else:
-                        end_idx = buffer.find("[/RESPONSE]")
-                        if end_idx != -1:
-                            yield json.dumps({"type": "token", "content": buffer[:end_idx]}) + "\n"
-                            buffer = ""
-                            in_response_value = False
+                        if "[RESPONSE]" in buffer:
+                            has_seen_response_tag = True
+                            idx = buffer.find("[RESPONSE]")
+                            # Discard everything before and including [RESPONSE]
+                            buffer = buffer[idx + 10:]
                         else:
+                            # If buffer is long, we can stream some of it, but we must not
+                            # stream a partial "[RESPONSE]" tag.
+                            if len(buffer) > 30:
+                                if "[" in buffer:
+                                    idx = buffer.find("[")
+                                    yield_content = buffer[:idx]
+                                    if yield_content:
+                                        yield json.dumps({"type": "token", "content": yield_content}) + "\n"
+                                    buffer = buffer[idx:]
+                                else:
+                                    yield json.dumps({"type": "token", "content": buffer}) + "\n"
+                                    buffer = ""
+                    
+                    if has_seen_response_tag and not streaming_completed:
+                        # Check if we have seen "[/RESPONSE]"
+                        if "[/RESPONSE]" in buffer:
+                            idx = buffer.find("[/RESPONSE]")
+                            yield_content = buffer[:idx]
+                            if yield_content:
+                                yield json.dumps({"type": "token", "content": yield_content}) + "\n"
+                            buffer = ""
+                            streaming_completed = True
+                        else:
+                            # Keep last 11 characters in buffer in case they are a prefix of "[/RESPONSE]"
                             if len(buffer) > 11:
-                                yield json.dumps({"type": "token", "content": buffer[:-11]}) + "\n"
+                                yield_content = buffer[:-11]
+                                yield json.dumps({"type": "token", "content": yield_content}) + "\n"
                                 buffer = buffer[-11:]
                                 
             # Flush any remaining buffer if it doesn't contain tags
-            if in_response_value and buffer:
-                end_idx = buffer.find("[/RESPONSE]")
-                if end_idx != -1:
-                    yield json.dumps({"type": "token", "content": buffer[:end_idx]}) + "\n"
-                elif "[/" not in buffer:
-                    yield json.dumps({"type": "token", "content": buffer}) + "\n"
+            if buffer and not streaming_completed:
+                if has_seen_response_tag:
+                    idx = buffer.find("[/RESPONSE]")
+                    if idx != -1:
+                        yield_content = buffer[:idx]
+                    else:
+                        # Strip any partial suffix that matches the start of "[/RESPONSE]"
+                        yield_content = buffer
+                        for i in range(1, 12):
+                            suffix = "[/RESPONSE]"[:i]
+                            if buffer.endswith(suffix):
+                                yield_content = buffer[:-i]
+                                break
+                    if yield_content:
+                        yield json.dumps({"type": "token", "content": yield_content}) + "\n"
+                else:
+                    # If we never saw [RESPONSE], yield the entire remaining buffer
+                    # but strip any partial trailing "[RESPONSE]" prefix just in case.
+                    yield_content = buffer
+                    for i in range(1, 11):
+                        prefix = "[RESPONSE]"[:i]
+                        if buffer.endswith(prefix):
+                            yield_content = buffer[:-i]
+                            break
+                    if yield_content:
+                        yield json.dumps({"type": "token", "content": yield_content}) + "\n"
                                 
             # Retrieve final state
             state = await agent_app.aget_state(config)
