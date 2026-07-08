@@ -224,15 +224,21 @@ def log_interaction_details(
         form_updates = {}
         result_messages = []
         
-        # 1. Match HCP
         hcp = find_hcp(db, hcp_name)
         if hcp:
             form_updates["hcp_id"] = hcp.id
             form_updates["hcp_name"] = hcp.name
-            result_messages.append(f"Selected HCP: {hcp.name}")
+            result_messages.append(
+                f"Selected existing HCP: {hcp.name} (Specialty: {hcp.specialty}, Clinic: {hcp.clinic}, Email: {hcp.email}, Preferences: {hcp.preferences or 'None'}). "
+                "CRITICAL: Inform the user that this doctor is already in the database and present this info. "
+                "Ask the user if there are any new preferences or updates they want to add to their profile."
+            )
         else:
             form_updates["hcp_name"] = hcp_name
-            result_messages.append(f"HCP '{hcp_name}' not found in database (will register as a custom entry).")
+            result_messages.append(
+                f"HCP '{hcp_name}' not found in database (will register as a custom entry). "
+                "Inform the user that this is a custom entry, and ask if they would like to add a specialty, clinic, email, or preferences to create a complete profile."
+            )
 
         # 2. Fill basic fields
         form_updates["interaction_type"] = interaction_type
@@ -364,6 +370,7 @@ def edit_interaction_details(field_name: str, new_value: str) -> str:
             form_updates[mapped_field] = matched_items
             display_value = ", ".join(matched_items)
         else:
+            result_detail = ""
             # Handle HCP Name matching to get hcp_id as well
             if mapped_field == "hcp_name":
                 hcp = find_hcp(db, new_value)
@@ -371,16 +378,25 @@ def edit_interaction_details(field_name: str, new_value: str) -> str:
                     form_updates["hcp_id"] = hcp.id
                     form_updates["hcp_name"] = hcp.name
                     new_value = hcp.name
+                    result_detail = (
+                        f"Matched existing HCP: {hcp.name} (Specialty: {hcp.specialty}, Clinic: {hcp.clinic}). "
+                        "Inform the user this doctor is already in the database and ask if they have any updates for their profile."
+                    )
                 else:
                     form_updates["hcp_id"] = None
                     form_updates["hcp_name"] = new_value
+                    result_detail = f"HCP '{new_value}' not found in database (custom entry). Ask if they want to register specialty/clinic."
             else:
                 form_updates[mapped_field] = new_value
             display_value = new_value
             
+        final_result = f"Updated form field '{mapped_field}' to '{display_value}'."
+        if result_detail:
+            final_result += f" {result_detail}"
+            
         return json.dumps({
             "status": "success",
-            "result": f"Updated form field '{mapped_field}' to '{display_value}'.",
+            "result": final_result,
             "form_updates": form_updates
         })
     except Exception as e:

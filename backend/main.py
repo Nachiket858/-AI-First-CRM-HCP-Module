@@ -71,7 +71,8 @@ def save_interaction(form: FormState, db: Session = Depends(get_db)):
         if form.hcp_id:
             hcp = db.query(HCP).filter(HCP.id == form.hcp_id).first()
         elif form.hcp_name:
-            hcp = db.query(HCP).filter(HCP.name == form.hcp_name).first()
+            from tools import find_hcp
+            hcp = find_hcp(db, form.hcp_name)
             if not hcp:
                 # Dynamically create new HCP if name doesn't match
                 hcp = HCP(
