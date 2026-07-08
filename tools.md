@@ -9,11 +9,13 @@ This document explains the technical architecture, data model, LangGraph agent n
 The application is built using a decoupled client-server architecture:
 
 ```mermaid
-graph TD
-    Client[React SPA / Redux Toolkit] <-->|Server-Sent Events / JSON| API[FastAPI Web Server]
-    API <-->|LangGraph Loop| Agent[LangGraph AI Agent]
-    Agent <-->|System Tools| DB[(SQLite Database via SQLAlchemy)]
-    API <-->|CRUD Operations| DB
+flowchart TD
+    Client[React SPA / Redux Toolkit] -->|Requests / Submissions| API[FastAPI Web Server]
+    API -->|SSE Stream / JSON| Client
+    API -->|Invoke Agent| Agent[LangGraph AI Agent]
+    Agent -->|Tools / Model Response| API
+    Agent -->|Query / Save| DB[(SQLite Database via SQLAlchemy)]
+    API -->|Query / Save| DB
 ```
 
 1. **Frontend**: React SPA powered by Redux Toolkit for state management, styling with custom vanilla CSS variables (premium Slate-Zinc light theme), and icons from `lucide-react`.
@@ -28,12 +30,12 @@ graph TD
 The agent runs as a stateful graph utilizing conditional routing and checkpoint memory.
 
 ```mermaid
-stateDiagram-v2
-    [*] --> call_model : User Message Input
-    call_model --> should_continue : Check for Tool Calls
-    should_continue --> execute_tools : Yes (Tool Calls Present)
-    execute_tools --> call_model : Feed back tool outcomes & form state
-    should_continue --> [*] : No (Final Text Answer)
+flowchart TD
+    Start([Start]) --> call_model[call_model Node]
+    call_model --> should_continue{should_continue Edge}
+    should_continue -->|Yes: Tool Calls| execute_tools[execute_tools Node]
+    execute_tools --> call_model
+    should_continue -->|No: Final Answer| End([End])
 ```
 
 ### 1. State Definition
